@@ -8,19 +8,13 @@ logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename="tweepy.log")
 logger.addHandler(handler)
 
-# locals
-k = True
-list = []   # list will only store user ids
-recent = ""
-fn = ""
+# ------------------------------------------------------------------------------
 
+# helper functions
 def initialize():
    bearer_token = input("Enter your Bearer Token (Paste here): ")
    return bearer_token
 
-# ------------------------------------------------------------------------------
-
-# other functions
 def verify():
    verify = input("Are you sure you want to do this? (y/n): ")
    if verify == "y":
@@ -35,9 +29,9 @@ def get_tun():
    return input("Enter target username: ")
 
 def get_filename():
-   fn = input("Please enter a filename: ")
+   return str(input("Please enter a filename: "))
 
-def check_filename():
+def check_filename(fn):
    exist = os.path.exists(fn)
 
    if exist == False:
@@ -47,58 +41,78 @@ def check_filename():
    else:
       return 1
 
-def list2string():
-   l = []
-   for o in (len(list)-1):
-      l.append(list(o))
+def dict2stringlist(li):
+   fid = []
+   fum = []
+   for a in li.data:
+      fid.append(str(a.id))
+   for a in li.data:
+      fum.append(str(a.username)+"\n")
+   return fid, fum
 
 # ------------------------------------------------------------------------------
 
 # actions
-def followers(tid, tun):
-   recent = "follower"
-   list = client.get_list_followers(tid)
+def followers(client, tid, tun, li, recent):
+   recent = "followers"
+   c = client.get_users_followers(tid)
+   print("Action Completed Successfully\n")
+   # if more than 100 entries, loop and add results to list, then return
+   return li, recent
+
+def following(client, tid, tun, li, recent):
+   recent = "following"
+   c = client.get_users_following(tid)
+   print("Action Completed Successfully\n")
+   return li, recent
+
+def follow(client, li):
+   for p in (len(li)-1):
+      client.follow_list(li(p))
    print("Action Completed Successfully\n")
 
-def following(tid, tun):
-   recent = "following"
-   list = client.get_followed_lists(tid)
+def unfollow(client, li):
+   for p in (len(li)-1):
+      client.unfollow_list(li(p))
+   print("Action Completed Successfully\n")
 
-def follow(tid, tun):
-   for p in (len(list)-1):
-      client.follow_list(list(p))
-
-def unfollow(tid, tun):
-   for p in (len(list)-1):
-      client.unfollow_list(list(p))
-
-def export_list():
+def export_list(li, recent):
    recent = "export"
    if recent == "clear":
       print("no data has been grabbed yet\n")
-      return
+      return recent
 
    else:
-      get_filename()
+      fn = get_filename()
+      fid, fum = dict2stringlist(li)
       print("Exporting " + str(recent) + " data to " + str(fn) + "...\n")
 
-      with open(fn, 'w') as f:
-         f.write(list2string())
+      f = open(fn, 'w')
+      for user in fid:
+         f.write(user)
+      f.close()
+      print("Action Completed Successfully\n")
+      return recent
 
-def import_list():
+def import_list(li, recent):
    recent = "import"
-   get_filename()
-   check_filename
+   fn = get_filename()
+   if check_filename(fn) == 0:
+      return li, recent
 
    with open(fn, 'r') as f:
-      f.write()
+      li = f.read()
 
-def clear():
+   # CONVERT TO USABLE DATA
+
+   return li, recent
+
+def clear(li, recent):
    recent = "clear"
-   list = []
-   return
+   li = []
+   return li, recent
 
-def last():
+def last(recent):
    print(recent)
    return
 
@@ -118,54 +132,55 @@ def help():
 
 # ------------------------------------------------------------------------------
 
-def actions():
+def actions(client, li, recent):
    inner = input("What would you like to do (Type 'help' for options): ")
    if inner == "help":
       help()
-      return
+      return li, recent
 
    elif inner == "followers":
-      target_user_id = get_tid()
-      target_username = get_tun()
-      followers(target_user_id, target_username)
-      return
+      tid = get_tid()
+      tun = get_tun()
+      li, recent = followers(client, tid, tun, li, recent)
+      return li, recent
 
    elif inner == "following":
-      target_user_id = get_tid()
-      target_username = get_tun()
-      following(target_user_id, target_username)
-      return
+      tid = get_tid()
+      tun = get_tun()
+      li, recent = following(client, tid, tun, li, recent)
+      return li, recent
 
    elif inner == "follow":
       if verify():
-         follow()
+         follow(client, li)
+         return li, recent
       else:
-         return
+         return li, recent
 
    elif inner == "unfollow":
       if verify():
-         unfollow()
+         unfollow(client, li)
+         return li, recent
       else:
-         return
+         return li, recent
 
    elif inner == "export":
-      export_list()
-      return
+      recent = export_list(li, recent)
+      return li, recent
 
    elif inner == "import":
-      import_list()
-      return
+      li, recent = import_list(li, recent)
+      return li, recent
 
    elif inner == "clear":
-      clear()
-      return
+      li, recent = clear(li, recent)
+      return li, recent
    
    elif inner == "last":
-      last()
-      return
+      li, recent = last(recent)
+      return li, recent
 
    elif inner == "quit":
-      k = False
       exit(0)
 
    else:
@@ -176,9 +191,14 @@ def actions():
 def main():
    bearer_token = initialize()
    global client
-   client = tweepy.Client(bearer_token)
-   while k:
-      actions()
+   global li
+   global recent
+   client = tweepy.Client(bearer_token, wait_on_rate_limit=True)
+
+   li = {}
+   recent = ""
+   while True: # bad form, do not do
+      li, recent = actions(client, li, recent)
 
 if __name__=="__main__":
    main()
